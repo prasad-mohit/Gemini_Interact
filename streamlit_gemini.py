@@ -22,16 +22,23 @@ model = genai.GenerativeModel(model_name=selected_model)
   
 # Get user input  
 user_input = st.text_input("Ask me anything", key="user_input")  
-  
+
+
 async def get_response(user_input):  
-    # Add user message to conversation  
-    st.session_state.conversation.append({"role": "user", "content": user_input})  
+    try:  
+        # Add user message to conversation  
+        st.session_state.conversation.append({"role": "user", "content": user_input})  
   
-    # Generate response from the model  
-    async with aiohttp.ClientSession() as session:  
-        response = await model.generate(session, prompts=st.session_state.conversation)  
-        return response  
-  
+        # Generate response from the model  
+        async with aiohttp.ClientSession() as session:  
+            # Assuming that the "prompts" parameter should be a list of strings  
+            # extracted from the conversation history.  
+            prompts = [message['content'] for message in st.session_state.conversation if message['role'] == 'user']  
+            response = await model.generate(session, prompts=prompts)  
+            return response  
+    except Exception as e:  
+        st.error("An error occurred while generating the response: {}".format(e))  
+        return None    
 def show_conversation():  
     # Display conversation history  
     for chat in st.session_state.conversation:  
