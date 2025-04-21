@@ -2,63 +2,63 @@ import streamlit as st
 import asyncio  
 import aiohttp  
 import json  
-from datetime import datetime, timedelta  
   
-# Assuming google.generativeai as a placeholder module as it doesn't exist.  
-# You would replace this with the actual module you're using to interact with Gemini API.  
+# Assuming 'google.generativeai' and 'genai.GenerativeModel' are placeholders  
+# You would replace these with the actual module and classes you're using  
 import google.generativeai as genai  
   
-# Initialize conversation history if it doesn't exist  
+# Initialize session state for conversation history if it doesn't exist  
 if 'conversation' not in st.session_state:  
     st.session_state.conversation = []  
   
 # Configure Gemini with API key  
-genai.configure(api_key=st.secrets.get("GEMINI_API_KEY"))  
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])  
+model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")  
   
-# Model selection  
-model_options = ["models/gemini-1.5-flash", "models/gemini-1.5-pro"]  
-selected_model = st.selectbox("Select a model", model_options)  
-model = genai.GenerativeModel(model_name=selected_model)  
-  
-# Get user input  
-user_input = st.text_input("Ask me anything", key="user_input")  
-
-
-async def get_response(user_input):  
+# Function to get response from Gemini model  
+async def get_response(prompt):  
     try:  
-        # Add user message to conversation  
-        st.session_state.conversation.append({"role": "user", "content": user_input})  
-  
-        # Generate response from the model  
+        # Here you would implement the actual call to Gemini API  
+        # For now, it's just a placeholder function that returns the prompt  
+        # Replace with the actual API call  
         async with aiohttp.ClientSession() as session:  
-            # Assuming that the "prompts" parameter should be a list of strings  
-            # extracted from the conversation history.  
-            prompts = [message['content'] for message in st.session_state.conversation if message['role'] == 'user']  
-            response = await model.generate(session, prompts=prompts)  
+            # Replace 'model.generate' with the actual Gemini API call  
+            response = await model.generate(session, prompt=prompt)  
             return response  
     except Exception as e:  
-        st.error("An error occurred while generating the response: {}".format(e))  
-        return None    
-def show_conversation():  
-    # Display conversation history  
-    for chat in st.session_state.conversation:  
-        role = chat['role']  
-        content = chat['content']  
-        if role == "user":  
-            st.text_area("", content, key=f"user_{len(st.session_state.conversation)}", height=50)  
-        else:  
-            st.text_area("", content, key=f"model_{len(st.session_state.conversation)}", height=50)  
+        st.error(f"An error occurred: {e}")  
+        return None  
   
+# Function to display conversation  
+def show_conversation():  
+    for message in st.session_state.conversation:  
+        if message['role'] == 'user':  
+            st.text_area("", message['content'], key=f"user_{len(st.session_state.conversation)}", height=75, disabled=True)  
+        else:  
+            st.text_area("", message['content'], key=f"model_{len(st.session_state.conversation)}", height=75, disabled=True)  
+  
+# Streamlit layout  
+st.title("Gemini Model Interaction")  
+  
+# User input  
+user_input = st.text_input("Type your message here:", key="user_input")  
+  
+# Handling user input  
 if user_input:  
+    # Update conversation history with user input  
+    st.session_state.conversation.append({"role": "user", "content": user_input})  
+      
+    # Run the async get_response function  
     loop = asyncio.new_event_loop()  
     asyncio.set_event_loop(loop)  
     response = loop.run_until_complete(get_response(user_input))  
       
-    # Add model response to conversation  
-    st.session_state.conversation.append({"role": "model", "content": response})  
-      
-    # Reset user input  
+    # Update conversation history with model response  
+    if response:  
+        st.session_state.conversation.append({"role": "model", "content": response})  
+  
+    # Clear the input field after processing  
     st.session_state.user_input = ""  
   
-# Show conversation history  
+# Display conversation history  
 show_conversation()  
