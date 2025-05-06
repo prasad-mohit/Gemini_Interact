@@ -98,6 +98,6 @@ if st.button("Get Response"):
             # Graphical representation of the result  
             graphical_output(response.text)  
         except Exception as e:  
-            st.error(f"An error occurred: {{str(e)}") 
+            st.error(f"An error occurred: {str(e)}")  
 	else:
 	    st.warning("Please upload an image.")  
