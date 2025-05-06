@@ -36,13 +36,13 @@ prompt = st.text_input("Enter your question", value=default_prompt)
 def visualize_yolo(image):  
     # Convert PIL image to NumPy array  
     image_array = np.array(image)  
-      
+  
     # Perform YOLO inference  
     results = yolo_model(image_array)  
-      
+  
     # Get bounding box details  
     annotated_image = results[0].plot()  # Annotated image with bounding boxes  
-      
+  
     # Convert back to PIL for Streamlit display  
     annotated_image = Image.fromarray(annotated_image)  
     return annotated_image  
@@ -50,7 +50,7 @@ def visualize_yolo(image):
 # Graphical representation function  
 def graphical_output(response_text):  
     st.write("### Graphical Representation:")  
-      
+  
     # Quality meter  
     st.write("**Quality Meter:**")  
     if "high quality" in response_text.lower():  
@@ -59,14 +59,14 @@ def graphical_output(response_text):
         st.progress(50)  
     else:  
         st.progress(10)  
-      
+  
     # Pest problem  
     st.write("**Pest Problem:**")  
     if "pest detected" in response_text.lower():  
         st.image("red_pest_icon.png", width=50)  # Replace with actual pest icon file path  
     else:  
         st.image("green_tick_icon.png", width=50)  # Replace with actual tick icon file path  
-      
+  
     # Inedible status  
     st.write("**Inedible Status:**")  
     if "inedible" in response_text.lower():  
@@ -76,28 +76,26 @@ def graphical_output(response_text):
   
 # Process and display response  
 if st.button("Get Response"):  
-	if image_file is not None:  
-        	try:  
-        	    # Open uploaded image  
-            	image = Image.open(image_file)  
-              
-            	# Display original image  
-            	st.image(image, caption="Uploaded Image", use_column_width=True)  
-              
-            	# Visualize YOLO bounding boxes  
-            	annotated_image = visualize_yolo(image)  
-            	st.image(annotated_image, caption="YOLO Detection", use_column_width=True)  
-              
-            	# Generate response using Gemini  
-            	response = model.generate_content([image, prompt])  
-              
-            	# Display analysis result  
-            	st.write("### Analysis Result:")  
-            	st.write(response.text)  
-              
-            	# Graphical representation of the result  
-            	graphical_output(response.text)  
-        	except Exception as e:  
-            		st.error(f"An error occurred: {str(e)}")  
-	else:
-		st.warning("Please upload an image.")  
+    if image_file is not None:  
+        try:  
+            # Open uploaded image  
+            image = Image.open(image_file)  
+  
+            # Display original image  
+            st.image(image, caption="Uploaded Image", use_column_width=True)  
+  
+            # Visualize YOLO bounding boxes  
+            annotated_image = visualize_yolo(image)  
+            st.image(annotated_image, caption="YOLO Detection", use_column_width=True)  
+  
+            # Generate response using Gemini  
+            response = model.generate_content([image, prompt])  
+  
+            # Display analysis result  
+            st.write("### Analysis Result:")  
+            st.write(response.text)  
+  
+            # Graphical representation of the result  
+            graphical_output(response.text)  
+        except Exception as e:  
+            st.error(f"An error occurred: {str(e)}")  
