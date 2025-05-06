@@ -7,7 +7,7 @@ import os
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Initialize the Gemini model
-model = genai.GenerativeModel('gemini-pro-vision')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 # Streamlit app setup
 st.title("Crop Leaf Analysis")
