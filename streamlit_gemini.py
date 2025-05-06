@@ -76,28 +76,28 @@ def graphical_output(response_text):
   
 # Process and display response  
 if st.button("Get Response"):  
-    if image_file is not None:  
-        try:  
-            # Open uploaded image  
-            image = Image.open(image_file)  
+	if image_file is not None:  
+        	try:  
+        	    # Open uploaded image  
+            	image = Image.open(image_file)  
               
-            # Display original image  
-            st.image(image, caption="Uploaded Image", use_column_width=True)  
+            	# Display original image  
+            	st.image(image, caption="Uploaded Image", use_column_width=True)  
               
-            # Visualize YOLO bounding boxes  
-            annotated_image = visualize_yolo(image)  
-            st.image(annotated_image, caption="YOLO Detection", use_column_width=True)  
+            	# Visualize YOLO bounding boxes  
+            	annotated_image = visualize_yolo(image)  
+            	st.image(annotated_image, caption="YOLO Detection", use_column_width=True)  
               
-            # Generate response using Gemini  
-            response = model.generate_content([image, prompt])  
+            	# Generate response using Gemini  
+            	response = model.generate_content([image, prompt])  
               
-            # Display analysis result  
-            st.write("### Analysis Result:")  
-            st.write(response.text)  
+            	# Display analysis result  
+            	st.write("### Analysis Result:")  
+            	st.write(response.text)  
               
-            # Graphical representation of the result  
-            graphical_output(response.text)  
-        except Exception as e:  
-            st.error(f"An error occurred: {str(e)}")  
+            	# Graphical representation of the result  
+            	graphical_output(response.text)  
+        	except Exception as e:  
+            		st.error(f"An error occurred: {str(e)}")  
 	else:
-	    st.warning("Please upload an image.")  
+		st.warning("Please upload an image.")  
