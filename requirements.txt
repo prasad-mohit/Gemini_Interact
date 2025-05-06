@@ -1,5 +1,7 @@
 streamlit
-aiohttp
-python-dateutil
 google-generativeai
-pillow
+Pillow
+opencv-python  
+torch
+ultralytics
+numpy
