@@ -1,101 +1,147 @@
 import streamlit as st  
+import requests  
+from bs4 import BeautifulSoup  
 import google.generativeai as genai  
-import cv2  
-import numpy as np  
-from PIL import Image  
+from pptx import Presentation  
+from pptx.util import Inches  
+from fpdf import FPDF  
 import os  
-import torch  
-from ultralytics import YOLO  
   
-# Configure Gemini API key  
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))  
-  
-# Initialize the Gemini model  
+# Configure Google Generative AI  
+genai.configure(api_key="AIzaSyCvM4yzyrUflRJdug-E9wtV_0ALWCwVGY0")  
 model = genai.GenerativeModel('gemini-1.5-flash')  
   
-# Load YOLO model (make sure the YOLO weights are available locally or via URL)  
-yolo_model = YOLO("yolov8n.pt")  # Replace with a specific model if needed  
+# Memory to store citations  
+agent_memory = {}  
   
-# Streamlit app setup  
-st.title("Sakman Horticulture Image Analysis")  
-st.write("Upload a clear photo of your Horticulture product to analyze its quality and check for diseases.")  
+# PDF Generator Class  
+class PDFExporter:  
+    def __init__(self):  
+        self.pdf = FPDF()  
+        self.pdf.set_auto_page_break(auto=True, margin=15)  
+        self.pdf.add_page()  
+        self.pdf.set_font("Arial", size=12)  
   
-# Crop type selection  
-crop_type = st.selectbox("Select crop type", ["Tea Leaf", "Apple", "Other"])  
-if crop_type == "Other":  
-    crop_type = st.text_input("Enter crop type", "Specify crop")  
+    def add_abstract(self, title, abstract, url):  
+        # Handle potential Unicode issues by sanitizing text  
+        title = self.sanitize_text(title)  
+        abstract = self.sanitize_text(abstract)  
+        url = self.sanitize_text(url)  
+          
+        self.pdf.set_font("Arial", 'B', 12)  
+        self.pdf.cell(200, 10, txt=title, ln=True)  
+        self.pdf.set_font("Arial", size=11)  
+        self.pdf.multi_cell(0, 10, f"{abstract}\nLink: {url}\n\n")  
   
-# Image uploader  
-image_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])  
+    def export(self, filename):  
+        self.pdf.output(filename)  
   
-# Prompt input  
-default_prompt = f"Analyze this {crop_type} for quality and any diseases."  
-prompt = st.text_input("Enter your question", value=default_prompt)  
+    def sanitize_text(self, text):  
+        """Sanitize text to remove unsupported characters."""  
+        return text.encode('latin1', 'replace').decode('latin1')  
   
-# YOLO bounding box visualization function  
-def visualize_yolo(image):  
-    # Convert PIL image to NumPy array  
-    image_array = np.array(image)  
+# Scraper Agent  
+def fetch_pubmed_articles(disease, limit=3):  
+    query = f"reducing {disease} readmission"  
+    search_url = f"https://pubmed.ncbi.nlm.nih.gov/?term={query.replace(' ', '+')}"  
+    response = requests.get(search_url)  
+    soup = BeautifulSoup(response.text, "html.parser")  
+    articles = soup.select(".docsum-content")[:limit]  
   
-    # Perform YOLO inference  
-    results = yolo_model(image_array)  
+    results = []  
+    for article in articles:  
+        title_tag = article.select_one("a.docsum-title")  
+        if not title_tag:  
+            continue  
+        title = title_tag.get_text(strip=True)  
+        article_url = "https://pubmed.ncbi.nlm.nih.gov" + title_tag["href"]  
+        abstract = fetch_abstract(article_url)  
+        results.append({"title": title, "url": article_url, "abstract": abstract})  
+    return results  
   
-    # Get bounding box details  
-    annotated_image = results[0].plot()  # Annotated image with bounding boxes  
+def fetch_abstract(url):  
+    response = requests.get(url)  
+    soup = BeautifulSoup(response.text, "html.parser")  
+    abstract_tag = soup.select_one(".abstract-content.selected")  
+    return abstract_tag.get_text(strip=True) if abstract_tag else "No abstract available."  
   
-    # Convert back to PIL for Streamlit display  
-    annotated_image = Image.fromarray(annotated_image)  
-    return annotated_image  
+# Summarizer Agent  
+def summarize_with_gemini(disease, articles):  
+    full_text = "\n\n".join([f"Title: {a['title']}\nAbstract: {a['abstract']}" for a in articles])  
+    prompt = f"""You are an expert summarizer. Your task is to extract key clinical and administrative insights.  
+Disease: {disease}  
+Summarize the following abstracts:  
+{full_text}  
+Output two sections:  
+1. Clinical Strategy: (for doctors)  
+2. Administrative Actions: (for hospital administrators)"""  
+    response = model.generate_content(prompt)  
+    return response.text.strip()  
   
-# Graphical representation function  
-def graphical_output(response_text):  
-    st.write("### Graphical Representation:")  
+# Deck Builder  
+def create_deck(summaries):  
+    prs = Presentation()  
+    for disease, content in summaries.items():  
+        slide_layout = prs.slide_layouts[1]  
+        slide = prs.slides.add_slide(slide_layout)  
+        slide.shapes.title.text = disease  
+        slide.placeholders[1].text = content  
   
-    # Quality meter  
-    st.write("**Quality Meter:**")  
-    if "high quality" in response_text.lower():  
-        st.progress(100)  
-    elif "medium quality" in response_text.lower():  
-        st.progress(50)  
-    else:  
-        st.progress(10)  
+    # Add a final slide summarizing all diseases  
+    final_slide = prs.slides.add_slide(prs.slide_layouts[1])  
+    final_slide.shapes.title.text = "Comprehensive Readmission Program"  
+    final_slide.placeholders[1].text = "\n\n".join([f"{d}: Summary Available" for d in summaries])  
   
-    # Pest problem  
-    st.write("**Pest Problem:**")  
-    if "pest detected" in response_text.lower():  
-        st.image("red_pest_icon.png", width=50)  # Replace with actual pest icon file path  
-    else:  
-        st.image("green_tick_icon.png", width=50)  # Replace with actual tick icon file path  
+    # Save the PowerPoint presentation  
+    prs.save("readmission_summary_deck.pptx")  
   
-    # Inedible status  
-    st.write("**Inedible Status:**")  
-    if "inedible" in response_text.lower():  
-        st.image("red_x_icon.png", width=50)  # Replace with actual X icon file path  
-    else:  
-        st.image("green_tick_icon.png", width=50)  # Replace with actual tick icon file path  
+# ====== STREAMLIT UI ======  
+st.title("📚 Agentic AI - Medical Readmission Strategy Generator")  
+st.markdown("Searches PubMed, summarizes using Gemini, and generates PDF + PPTX outputs.")  
   
-# Process and display response  
-if st.button("Get Response"):  
-    if image_file is not None:  
-        try:  
-            # Open uploaded image  
-            image = Image.open(image_file)  
+# Input field for diseases  
+diseases = st.text_input("Enter diseases (comma separated)", "CHF, Sepsis, UTI, Kidney failure")  
   
-            # Display original image  
-            st.image(image, caption="Uploaded Image", use_column_width=True)  
+# Button to trigger the generation process  
+if st.button("Generate Summary & Deck"):  
+    st.info("Processing...")  
+    disease_list = [d.strip() for d in diseases.split(",")]  
+    summaries = {}  
+    pdf = PDFExporter()  
   
-            # Visualize YOLO bounding boxes  
-            annotated_image = visualize_yolo(image)  
-            st.image(annotated_image, caption="YOLO Detection", use_column_width=True)  
+    # Process each disease  
+    for disease in disease_list:  
+        st.write(f"🔍 Processing: **{disease}**")  
+        articles = fetch_pubmed_articles(disease)  
+        summary = summarize_with_gemini(disease, articles)  
+        summaries[disease] = summary  
   
-            # Generate response using Gemini  
-            response = model.generate_content([image, prompt])  
+        # Store citations in memory  
+        agent_memory[disease] = [(a['title'], a['url']) for a in articles]  
   
-            # Display analysis result  
-            st.write("### Analysis Result:")  
-            st.write(response.text)  
+        # Add articles to PDF  
+        for a in articles:  
+            pdf.add_abstract(a['title'], a['abstract'], a['url'])  
   
-            # Graphical representation of the result  
-            graphical_output(response.text)  
-        except Exception as e:  
-            st.error(f"An error occurred: {str(e)}")  
+        # Display the summary in the Streamlit UI  
+        st.markdown(f"**{disease} Summary:**")  
+        st.markdown(summary)  
+  
+    # Save outputs  
+    create_deck(summaries)  
+    pdf.export("pubmed_abstracts.pdf")  
+  
+    # Provide download buttons for the generated files  
+    with open("pubmed_abstracts.pdf", "rb") as f:  
+        st.download_button("📄 Download Abstracts PDF", f, file_name="pubmed_abstracts.pdf")  
+    with open("readmission_summary_deck.pptx", "rb") as f:  
+        st.download_button("📊 Download PowerPoint Deck", f, file_name="readmission_summary_deck.pptx")  
+  
+    st.success("✅ All done!")  
+  
+    # Display memory (citations)  
+    st.markdown("### 🔗 Citations (Memory)")  
+    for disease, citations in agent_memory.items():  
+        st.markdown(f"**{disease}**")  
+        for title, link in citations:  
+            st.markdown(f"- [{title}]({link})")  
